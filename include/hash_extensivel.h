@@ -5,7 +5,7 @@
 TAD do HashFile dinâmico. Três tipos de arquivos podem ser gerados
 <nome_arq>.hf - arquivo de dados (buckets)
 <nome_arq>.hfc - arquivo de cabeçalho/diretório 
-<nome_arq).hfd - o dump.
+<nome_arq>.hfd - o dump.
 */ 
 
 // Códigos de retorno padrão para facilitar os testes.

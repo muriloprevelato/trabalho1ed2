@@ -1,8 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <wchar.h>
 #include "hash_extensivel.h"
-
 
 #define MAX_CHAVE 20 // A chave pode ser tanto um cep (9 caracteres) ou um cpf (14 caracteres). Deixei uma margem.
 #define MAX_DADOS 256
@@ -147,6 +147,7 @@ HashExtensivel* abrirHash(const char* nome_arq, int cap_bucket){
         fflush(f_dir);
 
         Bucket balde_vazio;
+        memset(&balde_vazio, 0, sizeof(Bucket));
         balde_vazio.profundidade_local = 1;
         balde_vazio.qtd_registro = 0;
         for(int i = 0; i < MAX_CAP_BUCKET; i++) balde_vazio.registros[i].ativo = 0;
@@ -209,6 +210,7 @@ int inserirHash(HashExtensivel* hash, const char *chave, const char *dados){
     // novo balde, dois baldes com profundidade++ em relação a antes. 
     hash->num_splits++;
     Bucket novo_balde; 
+    memset(&novo_balde, 0, sizeof(Bucket));
     novo_balde.profundidade_local = balde.profundidade_local + 1;
     novo_balde.qtd_registro = 0;
     for(int i = 0; i < MAX_CAP_BUCKET; i++) novo_balde.registros[i].ativo = 0;
@@ -216,6 +218,7 @@ int inserirHash(HashExtensivel* hash, const char *chave, const char *dados){
 
     // limpando balde velho
     Registro temporarios[MAX_CAP_BUCKET + 1];
+    memset(temporarios, 0, sizeof(temporarios));
     int qtd_temp = 0;
     for(int i = 0; i < hash->cap_bucket; i++){
         if(balde.registros[i].ativo){
@@ -333,86 +336,96 @@ void dumpHash(HashExtensivel* hash, const char* nome_arq){
     FILE* f = fopen(nome_hfd, "wb");
     if(!f) return;
 
+    /* Escreve BOM UTF-16 LE */
     unsigned char bom[2] = {0xFF, 0xFE};
     fwrite(bom, 1, 2, f);
-    fclose(f);
 
-    f = fopen(nome_hfd, "ab");
-    if(!f) return;
+    /* Macros auxiliares: escreve string literal como UTF-16 LE */
+    #define W(str) do { \
+        const char *_s = (str); \
+        while(*_s){ unsigned char _b[2] = {(unsigned char)*_s, 0}; \
+        fwrite(_b, 1, 2, f); _s++; } \
+    } while(0)
 
-    fwide(f, 1);
-    
+    /* Escreve uma linha formatada como UTF-16 LE */
+    #define WLINE(buf) do { \
+        char _tmp[512]; \
+        snprintf(_tmp, sizeof(_tmp), "%s", buf); \
+        W(_tmp); \
+        unsigned char _nl[2] = {'\n', 0}; fwrite(_nl, 1, 2, f); \
+    } while(0)
+
+    char linha[512];
     int total = 1 << hash->profundidade_global;
     int size_record = (int)sizeof(Registro);
-    int size_block = (int)sizeof(Bucket);
+    int size_block  = (int)sizeof(Bucket);
 
-    // Buckets únicos para numBuckets
+    /* Conta buckets únicos */
     int num_buckets = 0;
     for(int i = 0; i < total; i++){
         int off_i = ler_offset_dir(hash, i);
         int unico = 1;
-        for(int j = 0; j < i; j++){
-            if(ler_offset_dir(hash, j) == off_i){
-                unico = 0;
-                break;
-            }
-        }
+        for(int j = 0; j < i; j++)
+            if(ler_offset_dir(hash, j) == off_i){ unico = 0; break; }
         if(unico) num_buckets++;
     }
 
+    /* Cabeçalho */
+    W("DUMP"); unsigned char nl[2] = {'\n',0}; fwrite(nl,1,2,f);
+    W("*Dump cabecalho"); fwrite(nl,1,2,f);
+    snprintf(linha,sizeof(linha),"numBuckets\t%d",  num_buckets);  WLINE(linha);
+    snprintf(linha,sizeof(linha),"sizeRecord\t%d",  size_record);  WLINE(linha);
+    snprintf(linha,sizeof(linha),"sizeBlock\t%d",   size_block);   WLINE(linha);
+    snprintf(linha,sizeof(linha),"offsetKey\t%d",   0);            WLINE(linha);
+    snprintf(linha,sizeof(linha),"sizeKey\t%d",     MAX_CHAVE);    WLINE(linha);
+    snprintf(linha,sizeof(linha),"offsetTable\t%d", (int)HEADER_SIZE); WLINE(linha);
+    snprintf(linha,sizeof(linha),"offsetBuckets\t%d",  0);         WLINE(linha);
+    snprintf(linha,sizeof(linha),"offsetOverflow\t%d", -1);        WLINE(linha);
 
-    fwprintf(f, L"= DUMP =\n");
-    fwprintf(f, L"* Dump cabecalho\n");
-    fwprintf(f, L"numBuckets\t%d\n", num_buckets);
-    fwprintf(f, L"sizeRecord\t%d\n", size_record);
-    fwprintf(f, L"sizeBlock\t%d\n", size_block);
-    fwprintf(f, L"offsetKey\t%d\n", 0); // Chave 1º campo do registro. ** Dar uma olhada dps no post do class.
-    fwprintf(f, L"sizeKey\t%d\n", MAX_CHAVE);
-    fwprintf(f, L"offsetTable\t%d\n", (int)HEADER_SIZE);
-    fwprintf(f, L"offsetBuckets\t%d\n", 0);  // 1º bucket -> offset 0
-    fwprintf(f, L"offsetOverflow\t%d\n", -1); // Sem área de overflow.
-
-    
-    // Diretório
-    fwprintf(f, L"* Dump table\n");
-    for (int i = 0; i < total; i++){
-        fwprintf(f, L"[%d]\t%d\n", i, ler_offset_dir(hash, i));
+    /* Diretório */
+    W("* Dump table"); fwrite(nl,1,2,f);
+    for(int i = 0; i < total; i++){
+        snprintf(linha, sizeof(linha), "[%d]\t%d", i, ler_offset_dir(hash, i));
+        WLINE(linha);
     }
 
-    // Buckets
-    fwprintf(f, L"* Dump buckets\n");
-
+    /* Buckets */
+    W("*Dump buckets"); fwrite(nl,1,2,f);
     int bloco = 0;
-    wchar_t dados_wide[MAX_DADOS + 1];
-
     for(int i = 0; i < total; i++){
         int offset = ler_offset_dir(hash, i);
-
-        // ** Verificar se esse endereço já foi impresso
         int ja_visto = 0;
-        for(int j = 0; j < i; j++){
-            if(ler_offset_dir(hash, j) == offset){
-                ja_visto = 1;
-                break;
-            }
-        }
+        for(int j = 0; j < i; j++)
+            if(ler_offset_dir(hash, j) == offset){ ja_visto = 1; break; }
         if(ja_visto) continue;
-        
+
         Bucket balde;
         ler_bucket(hash, offset, &balde);
-        
-        fwprintf(f, L"BLOCO: %d\n", bloco++);
+
+        snprintf(linha, sizeof(linha), "BLOCO: %d", bloco++);
+        WLINE(linha);
 
         for(int k = 0; k < hash->cap_bucket; k++){
-            dados_com_underline(balde.registros[k].dados, dados_wide, MAX_DADOS - 1);
-            fwprintf(f, L"%d\t|\t%hs\t|\t%ls\t|\t%d\t|\n", 
-                balde.registros[k].ativo, 
-                balde.registros[k].chave, 
-                dados_wide,
+            /* Substitui espaços por _ nos dados */
+            char dados_u[MAX_DADOS];
+            strncpy(dados_u, balde.registros[k].dados, MAX_DADOS - 1);
+            dados_u[MAX_DADOS - 1] = '\0';
+            for(int m = 0; dados_u[m]; m++)
+                if(dados_u[m] == ' ') dados_u[m] = '_';
+
+            snprintf(linha, sizeof(linha), "%d | %s | %s | %d |",
+                balde.registros[k].ativo,
+                balde.registros[k].chave,
+                dados_u,
                 balde.profundidade_local);
+            WLINE(linha);
         }
     }
 
-    fprintf(f, "= FIM DO DUMP =\n");
+    W("FIM DUMP"); fwrite(nl,1,2,f);
+
+    #undef W
+    #undef WLINE
+
     fclose(f);
 }

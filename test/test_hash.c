@@ -73,6 +73,7 @@ void test_inserirChaveAlfanumerica_CepECpf(void){
 
     TEST_ASSERT_EQUAL_INT(HASH_OK, buscarHash(hash, "123.456.789-00", buffer, sizeof(buffer)));
     TEST_ASSERT_EQUAL_STRING("Ze mane", buffer);
+    fecharHash(hash);
 }
 
 void test_inserirChaveDuplicada_DeveRetornarErro(void){
@@ -191,17 +192,16 @@ void test_dumpHash(void){
     inserirHash(hash, "cep3", "c");
 
     dumpHash(hash, TEST_PREFIX);
+    fecharHash(hash);
 
     char path_hfd[256];
     snprintf(path_hfd, sizeof(path_hfd), "%s.hfd", TEST_PREFIX);
     FILE* f = fopen(path_hfd, "r");
     TEST_ASSERT_NOT_NULL_MESSAGE(f, "Arquivo .hfd não foi gerado por dumpHash");
-    fecharHash(hash);
+    
     if(f){
         fclose(f);
     }
-
-    fecharHash(hash);
 }
 
 // Alguns caminhos infelizes separados.
