@@ -106,9 +106,9 @@ int removerEndereco(Pessoa *p){
 
 // Getters de endereço.
 
-const char* getPessoaEnderecoCep(const Pessoa *p) { return (p && p->morador) ? p->cep   : NULL; }
-char getPessoaEnderecoFace(const Pessoa *p) { return (p && p->morador) ? p->face  : '\0'; }
-int getPessoaEnderecoNum(const Pessoa *p) { return (p && p->morador) ? p->num   : -1; }
+const char* getPessoaEnderecoCep(const Pessoa *p) { return (p && p->morador) ? p->cep : NULL; }
+char getPessoaEnderecoFace(const Pessoa *p) { return (p && p->morador) ? p->face : '\0'; }
+int getPessoaEnderecoNum(const Pessoa *p) { return (p && p->morador) ? p->num : -1; }
 const char* getPessoaEnderecoCompl(const Pessoa *p) { return (p && p->morador) ? p->complemento : NULL; }
 
 // Serialização e desserialização.

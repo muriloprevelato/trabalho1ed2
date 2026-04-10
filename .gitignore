@@ -1,0 +1,21 @@
+cat > .gitignore << 'EOF'
+# Objetos compilados
+src/*.o
+
+# Executável principal
+src/ted
+
+# Executáveis de teste
+test/run_*
+
+# Arquivos gerados pelos testes do hashfile
+*.hf
+*.hfc
+*.hfd
+test/*.hf
+test/*.hfc
+test/*.hfd
+
+# Arquivos temporários dos testes
+temp_*.geo
+temp_*.pm

@@ -319,7 +319,7 @@ void fecharHash(HashExtensivel* hash){
 }
 
 // Função para deixar o campo de dados legíveis e com largura fixa.
-static void dados_com_underline(const char *src, wchar_t *dst, int largura) {
+void dados_com_underline(const char *src, wchar_t *dst, int largura) {
     int i;
     for (i = 0; src[i] != '\0' && i < largura; i++)
         dst[i] = (src[i] == ' ') ? L'_' : (wchar_t)src[i];

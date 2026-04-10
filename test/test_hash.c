@@ -227,7 +227,6 @@ void test_buscarHash_ponteiroNulo(void){
 }
 
 void test_removerHash_ponteiroNulo(void){
-    char buffer[50];
     TEST_ASSERT_EQUAL_INT(HASH_ERRO, removerHash(NULL, "cep02"));
 }
 
