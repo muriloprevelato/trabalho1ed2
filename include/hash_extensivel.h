@@ -2,7 +2,15 @@
 #define HASH_EXTENSIVEL_H
 
 /*
-TAD do HashFile dinâmico. Três tipos de arquivos podem ser gerados
+TAD do HashFile dinâmico.
+
+Implementa um Hashfile Extensível persistido em disco binário.
+A chave de busca é uma string alfanumérica (ex.: CEP "b01" ou
+CPF "123.456.789-00"), permitindo indexar tanto quadras quanto pessoas.
+Função de hash: djb2.
+Colisões são resolvidas por splits de buckets com duplicação do diretório.
+
+Três tipos de arquivos podem ser gerados
 <nome_arq>.hf - arquivo de dados (buckets)
 <nome_arq>.hfc - arquivo de cabeçalho/diretório 
 <nome_arq>.hfd - o dump.
