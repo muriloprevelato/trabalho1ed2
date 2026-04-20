@@ -21,7 +21,8 @@ OBJS = $(SRC)/hash_extensivel.o \
        $(SRC)/pessoa.o          \
        $(SRC)/leitorGeo.o       \
        $(SRC)/leitorPm.o        \
-       $(SRC)/svg.o
+       $(SRC)/svg.o             \
+       $(SRC)/leitorQry.o
 
 # =============================================================================
 # Flags de include compartilhadas
@@ -58,6 +59,10 @@ $(SRC)/leitorPm.o: $(SRC)/leitorPm.c $(INC)/leitorPm.h \
                     $(INC)/hash_extensivel.h $(INC)/pessoa.h
 
 $(SRC)/svg.o: $(SRC)/svg.c $(INC)/svg.h $(INC)/quadra.h
+
+$(SRC)/leitorQry.o: $(SRC)/leitorQry.c $(INC)/leitorQry.h \
+                    $(INC)/hash_extensivel.h $(INC)/quadra.h \
+                    $(INC)/pessoa.h $(INC)/svg.h
 
 $(SRC)/main.o: $(SRC)/main.c \
                $(INC)/hash_extensivel.h $(INC)/quadra.h $(INC)/pessoa.h \
@@ -110,17 +115,27 @@ tst_leitor_pm: $(SRC)/hash_extensivel.o $(SRC)/pessoa.o $(SRC)/leitorPm.o \
 	$(TST)/run_leitor_pm
 
 # svg
-tst_svg: $(SRC)/quadra.o $(SRC)/svg.o $(TST)/t_svg.c $(UNI)/unity.c
+tst_svg: $(SRC)/quadra.o $(SRC)/svg.o $(TST)/test_svg.c $(UNI)/unity.c
 	$(CC) $(CFLAGS) $(INC_FLAGS) \
 	    $(SRC)/quadra.o $(SRC)/svg.o \
-	    $(TST)/t_svg.c $(UNI)/unity.c \
+	    $(TST)/test_svg.c $(UNI)/unity.c \
 	    -o $(TST)/run_svg
 	$(TST)/run_svg
+
+tst_leitorqry: $(SRC)/hash_extensivel.o $(SRC)/quadra.o $(SRC)/pessoa.o \
+               $(SRC)/svg.o $(SRC)/leitorQry.o \
+               $(TST)/test_leitorQry.c $(UNI)/unity.c
+	$(CC) $(CFLAGS) $(INC_FLAGS) \
+	    $(SRC)/hash_extensivel.o $(SRC)/quadra.o $(SRC)/pessoa.o \
+	    $(SRC)/svg.o $(SRC)/leitorQry.o \
+	    $(TST)/test_leitorQry.c $(UNI)/unity.c \
+	    -o $(TST)/run_leitorqry
+	$(TST)/run_leitorqry
 
 # =============================================================================
 # tstall — compila e executa todos os testes unitários
 # =============================================================================
-tstall: tst_hash tst_quadra tst_pessoa tst_leitor_geo tst_leitor_pm tst_svg
+tstall: tst_hash tst_quadra tst_pessoa tst_leitor_geo tst_leitor_pm tst_svg tst_leitorqry
 
 # =============================================================================
 # Limpeza
@@ -128,10 +143,11 @@ tstall: tst_hash tst_quadra tst_pessoa tst_leitor_geo tst_leitor_pm tst_svg
 clean:
 	rm -f $(SRC)/*.o $(SRC)/$(PROJ_NAME)
 	rm -f $(TST)/run_hash $(TST)/run_quadra $(TST)/run_pessoa \
-	      $(TST)/run_leitor_geo $(TST)/run_leitor_pm $(TST)/run_svg
+	      $(TST)/run_leitor_geo $(TST)/run_leitor_pm \
+	      $(TST)/run_svg $(TST)/run_leitorqry
 	rm -f *.hf *.hfc *.hfd
 	rm -f $(TST)/*.hf $(TST)/*.hfc $(TST)/*.hfd
-	rm -f temp_*.geo temp_*.pm temp_*.svg
+	rm -f temp_*.geo temp_*.pm temp_*.svg temp_*.qry temp_*.txt
 
 .PHONY: ted tstall tst_hash tst_quadra tst_pessoa \
-        tst_leitor_geo tst_leitor_pm tst_svg clean
+        tst_leitor_geo tst_leitor_pm tst_svg tst_leitorqry clean

@@ -429,3 +429,32 @@ void dumpHash(HashExtensivel* hash, const char* nome_arq){
 
     fclose(f);
 }
+
+void iterarHash(HashExtensivel *hash, void (*callback)(const char *chave, const char *dados, void *cmd), void *cmd) {
+    if (!hash || !callback) return;
+
+    int total_dir = 1 << hash->profundidade_global;
+
+    /* Percorre apenas os buckets únicos — evita visitar o mesmo bucket
+    múltiplas vezes quando várias entradas do diretório apontam para ele */
+    for (int i = 0; i < total_dir; i++) {
+        int offset = ler_offset_dir(hash, i);
+
+        // Verifica se este offset já foi visitado. 
+        int ja_visto = 0;
+        for (int j = 0; j < i; j++) {
+            if (ler_offset_dir(hash, j) == offset) { ja_visto = 1; break; }
+        }
+        if (ja_visto) continue;
+
+        Bucket b;
+        ler_bucket(hash, offset, &b);
+
+        // Callback para cada slot.
+        for (int k = 0; k < hash->cap_bucket; k++) {
+            if (b.registros[k].ativo) {
+                callback(b.registros[k].chave, b.registros[k].dados, cmd);
+            }
+        }
+    }
+}

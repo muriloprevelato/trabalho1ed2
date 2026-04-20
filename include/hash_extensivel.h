@@ -75,4 +75,15 @@ void fecharHash(HashExtensivel* hash);
  */
 void dumpHash(HashExtensivel* hash, const char* nome_arq);
 
+/**
+ * @brief  Itera sobre todos os registros ativos do hashfile,
+ *         chamando o callback para cada um.
+ * @details Essa função vai ser necessária para os comandos .qry!
+ * @param hash Ponteiro do hashfile.
+ * @param callback Função chamada para cada registro ativo.
+ * Recebe chave, dados serializados e contexto.
+ * @param cmd Ponteiro de comando passado ao callback (pode ser NULL).
+ */
+void iterarHash(HashExtensivel *hash, void (*callback)(const char *chave, const char *dados, void *ctx), void *cmd);
+
 #endif

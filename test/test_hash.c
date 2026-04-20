@@ -242,6 +242,32 @@ void test_buscarHash_bufferPequeno(void){
     fecharHash(hash);
 }
 
+// Iterador
+
+// Contexto para o teste do iterador -> comando que vai ser usado.
+typedef struct { int contador; } CtxContador;
+
+static void callback_contador(const char *chave, const char *dados, void *cmd) {
+    (void)chave; (void)dados;
+    ((CtxContador*)cmd)->contador++;
+}
+
+void test_iterarHash_deveVisitarTodosOsRegistros(void) {
+    HashExtensivel *hash = abrirHash(TEST_PREFIX, CAP_BUCKET_TESTE);
+    TEST_ASSERT_NOT_NULL(hash);
+
+    inserirHash(hash, "cep01", "dado1");
+    inserirHash(hash, "cep02", "dado2");
+    inserirHash(hash, "cep03", "dado3");
+
+    CtxContador ctx = { 0 };
+    iterarHash(hash, callback_contador, &ctx);
+
+    TEST_ASSERT_EQUAL_INT(3, ctx.contador);
+
+    fecharHash(hash);
+}
+
 int main()
 {
     UNITY_BEGIN();
@@ -262,6 +288,7 @@ int main()
     RUN_TEST(test_buscarHash_ponteiroNulo);
     RUN_TEST(test_removerHash_ponteiroNulo);
     RUN_TEST(test_buscarHash_bufferPequeno);
+    RUN_TEST(test_iterarHash_deveVisitarTodosOsRegistros);
 
     return UNITY_END();
 }
