@@ -55,9 +55,11 @@ int desenharQuadra(ArqSvg *svg, const Quadra *q);
  * @param svg Ponteiro do arquivo SVG.
  * @param x Coordenada X do âncora.
  * @param y Coordenada Y do âncora.
+ * @param w Largura da quadra.
+ * @param h Altura da quadra.
  * @return SVG_OK -> 1 (Sucesso) / SVG_ERRO -> 0 (Erro).
  */
-int desenharMarcadorX(ArqSvg *svg, double x, double y);
+int desenharMarcadorX(ArqSvg *svg, double x, double y, double w, double h);
 
 /**
  * @brief Função que coloca uma pequena cruz no endereço (se ela não for um sem-teto) 
@@ -87,9 +89,10 @@ int desenharMarcadorCirculo(ArqSvg *svg, double x, double y);
  * @param x Coordenada x do âncora (mesmo padrão da quadra) do marcador.
  * @param y Coordenada y do âncora (mesmo padrão da quadra) do marcador.
  * @param cpf CPF da pessoa que será exibido dentro do quadrado.
+ * @param deslocamento varíavel para cuidar de múltiplas marcações e sobreposições.
  * @return SVG_OK -> 1 (Sucesso) / SVG_ERRO -> 0 (Erro). 
  */
-int desenharMarcadorQuadrado(ArqSvg *svg, double x, double y, const char *cpf);
+int desenharMarcadorQuadrado(ArqSvg *svg, double x, double y, const char *cpf, int deslocamento);
 
 /**
  * @brief Função que escreve um texto centralizado numa região retangular.

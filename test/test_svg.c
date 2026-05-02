@@ -141,7 +141,7 @@ void test_desenharMarcadorX_deveRetornarOK(void){
     ArqSvg *svg = abrirSvg(SVG_TEMP);
     TEST_ASSERT_NOT_NULL(svg);
 
-    TEST_ASSERT_EQUAL_INT(SVG_OK, desenharMarcadorX(svg, 60.0, 20.0)); // Medidas aleatórias
+    TEST_ASSERT_EQUAL_INT(SVG_OK, desenharMarcadorX(svg, 60.0, 20.0, 50.0, 30.0)); // Medidas aleatórias
 
     fecharSvg(svg);
 }
@@ -149,7 +149,7 @@ void test_desenharMarcadorX_deveRetornarOK(void){
 void test_desenharMarcadorX_deveGerarLinhasVermelhas(void){
     ArqSvg *svg = abrirSvg(SVG_TEMP);
     TEST_ASSERT_NOT_NULL(svg);
-    desenharMarcadorX(svg, 60.0, 20.0);
+    desenharMarcadorX(svg, 60.0, 20.0, 50.0, 30.0);
     fecharSvg(svg);
 
     TEST_ASSERT_TRUE(arquivoContemString(SVG_TEMP, "<line"));
@@ -198,7 +198,7 @@ void test_desenharMarcadorQuadrado_deveRetornarOK(void){
     ArqSvg *svg = abrirSvg(SVG_TEMP);
     TEST_ASSERT_NOT_NULL(svg);
 
-    TEST_ASSERT_EQUAL_INT(SVG_OK, desenharMarcadorQuadrado(svg, 60.0, 20.0, "123.456.789-00"));
+    TEST_ASSERT_EQUAL_INT(SVG_OK, desenharMarcadorQuadrado(svg, 60.0, 20.0, "123.456.789-00", 0));
 
     fecharSvg(svg);
 }
@@ -206,7 +206,7 @@ void test_desenharMarcadorQuadrado_deveRetornarOK(void){
 void test_desenharMarcadorQuadrado_deveConterCPF(void){
     ArqSvg *svg = abrirSvg(SVG_TEMP);
     TEST_ASSERT_NOT_NULL(svg);
-    desenharMarcadorQuadrado(svg, 60.0, 20.0, "123.456.789-00");
+    desenharMarcadorQuadrado(svg, 60.0, 20.0, "123.456.789-00", 0);
     fecharSvg(svg);
 
     TEST_ASSERT_TRUE(arquivoContemString(SVG_TEMP, "123.456.789-00"));
@@ -256,10 +256,10 @@ void test_desenharTexto_deveConterTexto(void){
 // Caminhos infelizes
 
 void test_marcadores_comSvgNull_deveRetornarErro(void){
-    TEST_ASSERT_EQUAL_INT(SVG_ERRO, desenharMarcadorX(NULL, 0.0, 0.0));
+    TEST_ASSERT_EQUAL_INT(SVG_ERRO, desenharMarcadorX(NULL, 0.0, 0.0, 0.0, 0.0));
     TEST_ASSERT_EQUAL_INT(SVG_ERRO, desenharMarcadorCruz(NULL, 0.0, 0.0));
     TEST_ASSERT_EQUAL_INT(SVG_ERRO, desenharMarcadorCirculo(NULL, 0.0, 0.0));
-    TEST_ASSERT_EQUAL_INT(SVG_ERRO, desenharMarcadorQuadrado(NULL, 0.0, 0.0, "cpf"));
+    TEST_ASSERT_EQUAL_INT(SVG_ERRO, desenharMarcadorQuadrado(NULL, 0.0, 0.0, "cpf", 0));
     TEST_ASSERT_EQUAL_INT(SVG_ERRO, desenharTextoCentro(NULL, 0.0, 0.0, "txt"));
     TEST_ASSERT_EQUAL_INT(SVG_ERRO, desenharTexto(NULL, 0.0, 0.0, "txt"));
 }

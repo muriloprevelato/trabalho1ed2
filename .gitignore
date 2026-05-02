@@ -19,3 +19,7 @@ test/*.hfd
 # Arquivos temporários dos testes
 temp_*.geo
 temp_*.pm
+
+# Pastas com testes e saídas
+testes/
+saida/

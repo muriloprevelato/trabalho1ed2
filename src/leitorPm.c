@@ -15,8 +15,9 @@ static int processar_linha_p(const char *linha, HashExtensivel *hash) {
     char sexo_str[4];
     char nasc[PESSOA_NASC_MAX];
 
-    if(sscanf(linha, "%3s %14s %49s %49s %1s %10s", cmd, cpf, nome, sobrenome, sexo_str, nasc) != 6)
+    if(sscanf(linha, "%3s %14s %49s %49s %1s %10s", cmd, cpf, nome, sobrenome, sexo_str, nasc) != 6){
         return 0;
+    }
 
     Pessoa *p = criarPessoa(cpf, nome, sobrenome, sexo_str[0], nasc);
     if(!p) return 0;
@@ -27,7 +28,11 @@ static int processar_linha_p(const char *linha, HashExtensivel *hash) {
 
     if(ok != PESSOA_OK) return 0;
 
-    return inserirHash(hash, cpf, buffer) == HASH_OK ? 1 : 0;
+    int status_insercao = inserirHash(hash, cpf, buffer);
+    if(status_insercao != HASH_OK) {
+    }
+
+    return status_insercao == HASH_OK ? 1 : 0;
 }
 
 static int processar_linha_m(const char *linha, HashExtensivel *hash) {
@@ -58,7 +63,12 @@ static int processar_linha_m(const char *linha, HashExtensivel *hash) {
     if(ok != PESSOA_OK) return 0;
 
     removerHash(hash, cpf);
-    return inserirHash(hash, cpf, buffer_atualizado) == HASH_OK ? 1 : 0;
+    int status_insercao = inserirHash(hash, cpf, buffer_atualizado);
+    
+    if(status_insercao != HASH_OK) {
+    }
+    
+    return status_insercao == HASH_OK ? 1 : 0;
 }
 
 int lerArqPm(const char *caminhoArqPm, HashExtensivel *HashPessoas){

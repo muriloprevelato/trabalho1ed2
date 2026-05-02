@@ -109,6 +109,8 @@ static void cmd_rq(const char* linha, HashExtensivel* quadras, HashExtensivel* p
 
     double ax = getQuadraX(q);
     double ay = getQuadraY(q);
+    double aw = getQuadraW(q);
+    double ah = getQuadraH(q);    
     destruirQuadra(q);
 
     fprintf(txt, "[*] rq %s\n", cep);
@@ -117,7 +119,7 @@ static void cmd_rq(const char* linha, HashExtensivel* quadras, HashExtensivel* p
     iterarHash(pessoas, cb_rq, &ctx);
 
     removerHash(quadras, cep);
-    desenharMarcadorX(svg, ax, ay); // X na quadra a ser removida.
+    desenharMarcadorX(svg, ax, ay, aw, ah); // X na quadra a ser removida.
 }
 
 static void cmd_pq(const char* linha, HashExtensivel* quadras, HashExtensivel* pessoas, ArqSvg* svg, FILE* txt){
@@ -140,19 +142,23 @@ static void cmd_pq(const char* linha, HashExtensivel* quadras, HashExtensivel* p
     iterarHash(pessoas, cb_pq, &ctx);
 
     int total = ctx.n + ctx.s + ctx.l + ctx.o;
+
+    static int deslocamento = 0;
+    double offset = deslocamento * 4.0;
+    deslocamento++;
     char texto[32];
 
     snprintf(texto, sizeof(texto), "N:%d", ctx.n);
-    desenharTexto(svg, x + w/2, y + h + 8, texto);
+    desenharTexto(svg, x + w/2, y + h + 8 + offset, texto);
     snprintf(texto, sizeof(texto), "S:%d", ctx.s);
-    desenharTexto(svg, x + w/2, y - 3, texto);
+    desenharTexto(svg, x + w/2, y - 3 - offset, texto);
     snprintf(texto, sizeof(texto), "L:%d", ctx.l);
-    desenharTexto(svg, x + 10, y + h/2, texto);
+    desenharTexto(svg, x + 10, y + h/2 + offset, texto);
     snprintf(texto, sizeof(texto), "O:%d", ctx.o);
-    desenharTexto(svg, x + w + 2, y + h/2, texto);
+    desenharTexto(svg, x + w + 2, y + h/2 + offset, texto);
 
     snprintf(texto, sizeof(texto), "%d", total);
-    desenharTextoCentro(svg, x + w/2, y + h/2, texto);
+    desenharTextoCentro(svg, x + w/2, y + h/2 + offset, texto);
 
     fprintf(txt, "[*] pq %s\n", cep);
     fprintf(txt, "N:%d S:%d L:%d O:%d total:%d\n", ctx.n, ctx.s, ctx.l, ctx.o, total);
@@ -170,7 +176,7 @@ static void cmd_censo(HashExtensivel* pessoas, FILE* txt){
     double pct_homem = ctx.total > 0 ? (double)ctx.homens / ctx.total * 100.0 : 0.0;
     double pct_mulher = ctx.total > 0 ? (double)ctx.mulheres / ctx.total * 100.0 : 0.0;
     double pct_homem_morador = ctx.moradores > 0 ? (double)ctx.homens_moradores / ctx.moradores * 100.0 : 0.0;
-    double pct_mulher_morador = ctx.moradores > 0 ? (double)ctx.mulheres_moradores / ctx.total * 100.0 : 0.0;
+    double pct_mulher_morador = ctx.moradores > 0 ? (double)ctx.mulheres_moradores / ctx.moradores * 100.0 : 0.0;
     double pct_homem_sem_teto = sem_teto > 0 ? (double)homens_sem_teto / sem_teto * 100.0 : 0.0;
     double pct_mulher_sem_teto = sem_teto > 0 ? (double)mulheres_sem_teto / sem_teto * 100.0 : 0.0;
 
@@ -287,10 +293,11 @@ static void cmd_mud(const char* linha, HashExtensivel* quadras, HashExtensivel* 
     }
 
     char bufferQuadra[QUADRA_SERIAL_MAX];
+    static int deslocamento = 0;
     if(buscarHash(quadras, cep, bufferQuadra, sizeof(bufferQuadra)) == HASH_OK){
         Quadra *q = desserializarQuadra(bufferQuadra);
         if(q){
-            desenharMarcadorQuadrado(svg, getQuadraX(q), getQuadraY(q), cpf);
+            desenharMarcadorQuadrado(svg, getQuadraX(q), getQuadraY(q), cpf, deslocamento++);
             destruirQuadra(q);
         }
     }

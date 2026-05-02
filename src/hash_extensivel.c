@@ -6,7 +6,8 @@
 
 #define MAX_CHAVE 20 // A chave pode ser tanto um cep (9 caracteres) ou um cpf (14 caracteres). Deixei uma margem.
 #define MAX_DADOS 256
-#define MAX_CAP_BUCKET 10 // teto (segurança).
+#define MAX_CAP_BUCKET 100 // teto (segurança).
+#define MAX_PROFUNDIDADE 20
 
 // Tamanho do cabeçalho .hfc (profundidade_global + cap_bucket)
 #define HEADER_SIZE ((long)(2 * sizeof(int))) // meta-dados
@@ -80,7 +81,7 @@ static int buscar_no_bucket(const Bucket *b, const char *chave, int cap) {
 }
 
 void duplicar_diretorio(HashExtensivel *hash){
-    int tamanho_antigo = 1 << hash->profundidade_global;
+    unsigned int tamanho_antigo = 1u << (unsigned)hash->profundidade_global;
     int *diretorio = (int*) malloc((size_t)tamanho_antigo * sizeof(int));
     if(!diretorio) return;
 
@@ -201,63 +202,112 @@ int inserirHash(HashExtensivel* hash, const char *chave, const char *dados){
 
     // BALDE CHEIO
 
-    if(balde.profundidade_local == hash->profundidade_global){
-        duplicar_diretorio(hash);
-        return inserirHash(hash, chave, dados); // Diretório dobrou, então chamamos a função denovo.
-    }
-
-    // Nesse caso aqui vamos tratar quando ainda dá para aumentar a profundidade local.
-    // novo balde, dois baldes com profundidade++ em relação a antes. 
-    hash->num_splits++;
-    Bucket novo_balde; 
-    memset(&novo_balde, 0, sizeof(Bucket));
-    novo_balde.profundidade_local = balde.profundidade_local + 1;
-    novo_balde.qtd_registro = 0;
-    for(int i = 0; i < MAX_CAP_BUCKET; i++) novo_balde.registros[i].ativo = 0;
-    balde.profundidade_local++;
-
-    // limpando balde velho
     Registro temporarios[MAX_CAP_BUCKET + 1];
     memset(temporarios, 0, sizeof(temporarios));
     int qtd_temp = 0;
+
     for(int i = 0; i < hash->cap_bucket; i++){
         if(balde.registros[i].ativo){
             temporarios[qtd_temp++] = balde.registros[i];
-            balde.registros[i].ativo = 0;
         }
     }
+
     strncpy(temporarios[qtd_temp].chave, chave, MAX_CHAVE - 1);
     temporarios[qtd_temp].chave[MAX_CHAVE - 1] = '\0';
     strncpy(temporarios[qtd_temp].dados, dados, MAX_DADOS - 1);
     temporarios[qtd_temp].dados[MAX_DADOS - 1] = '\0';
     temporarios[qtd_temp].ativo = 1;
     qtd_temp++;
-    balde.qtd_registro = 0;
 
-    // gravar os dois baldes no disco
-    fseek(hash->arquivo_dados, 0, SEEK_END);
-    int novo_offset = (int)ftell(hash->arquivo_dados);
-    gravar_bucket(hash, novo_offset, &novo_balde);
-    gravar_bucket(hash, offset, &balde);
+    int resolvido = 0;
 
+    while(!resolvido){
+        if(balde.profundidade_local == hash->profundidade_global){
+            if(hash->profundidade_global >= MAX_PROFUNDIDADE){
+                // FIX: Usando hash->cap_bucket em vez do MAX_CAP_BUCKET
+                balde.qtd_registro = hash->cap_bucket;
+                for(int i = 0; i < hash->cap_bucket; i++){
+                    balde.registros[i] = temporarios[i];
+                }
+                gravar_bucket(hash, offset, &balde);
+                return HASH_ERRO;
+            }
+            duplicar_diretorio(hash);
+        }
 
-    // Atualizando ponteiros
-    int total_entradas = 1 << hash->profundidade_global;
-    int prof_nova = balde.profundidade_local; // Já foi incrementada!!!!
-    int mask_antiga = (1 << (prof_nova - 1)) - 1;
-    int hash_antigo = indice & mask_antiga;
-    int bit_novo = 1 << (prof_nova - 1);
+        hash->num_splits++;
+        int nova_prof_local = balde.profundidade_local + 1;
+        int bit_decisao = 1 << (nova_prof_local - 1);
 
-    for(int i = 0; i < total_entradas; i++){
-        if((i & mask_antiga) == hash_antigo){
-            int offset_correto = (i & bit_novo) ? novo_offset : offset;
-            gravar_offset_dir(hash, i, offset_correto);
+        Registro reg0[MAX_CAP_BUCKET + 1];
+        Registro reg1[MAX_CAP_BUCKET + 1];
+        int qtd0 = 0;
+        int qtd1 = 0;
+
+        for(int i = 0; i < qtd_temp; i++){
+            int hash_val = (int)hash_chave(temporarios[i].chave, nova_prof_local);
+            if((hash_val & bit_decisao) == 0){
+                reg0[qtd0++] = temporarios[i];
+            } else{
+                reg1[qtd1++] = temporarios[i];
+            }
+        }
+
+        Bucket novo_balde;
+        memset(&novo_balde, 0, sizeof(Bucket));
+        novo_balde.profundidade_local = nova_prof_local;
+        balde.profundidade_local = nova_prof_local;
+
+        fseek(hash->arquivo_dados, 0, SEEK_END);
+        int novo_offset = (int)ftell(hash->arquivo_dados);
+        
+        // A reserva salva-vidas para o offset não ser roubado!
+        gravar_bucket(hash, novo_offset, &novo_balde);
+
+        int total_entradas = 1 << hash->profundidade_global;
+        for(int i = 0; i < total_entradas; i++){
+            if(ler_offset_dir(hash, i) == offset){
+                if((i & bit_decisao) != 0){
+                    gravar_offset_dir(hash, i, novo_offset);
+                }
+            }
+        }
+        fflush(hash->arquivo_cabecalho);
+
+        // FIX: Usando hash->cap_bucket na validação da cascata!
+        if(qtd0 <= hash->cap_bucket && qtd1 <= hash->cap_bucket){
+            balde.qtd_registro = qtd0;
+            for(int i = 0; i < qtd0; i++) balde.registros[i] = reg0[i];
+            for(int i = qtd0; i < MAX_CAP_BUCKET; i++) balde.registros[i].ativo = 0;
+
+            novo_balde.qtd_registro = qtd1;
+            for(int i = 0; i < qtd1; i++) novo_balde.registros[i] = reg1[i];
+
+            gravar_bucket(hash, offset, &balde);
+            gravar_bucket(hash, novo_offset, &novo_balde);
+            resolvido = 1;
+        } else {
+            // FIX: Usando hash->cap_bucket
+            if(qtd0 > hash->cap_bucket){
+                novo_balde.qtd_registro = qtd1;
+                for(int i = 0; i < qtd1; i++) novo_balde.registros[i] = reg1[i];
+                gravar_bucket(hash, novo_offset, &novo_balde);
+
+                qtd_temp = qtd0;
+                for(int i = 0; i < qtd0; i++) temporarios[i] = reg0[i];
+            } else {
+                balde.qtd_registro = qtd0;
+                for(int i = 0; i < qtd0; i++) balde.registros[i] = reg0[i];
+                for(int i = qtd0; i < MAX_CAP_BUCKET; i++) balde.registros[i].ativo = 0;
+                gravar_bucket(hash, offset, &balde);
+
+                offset = novo_offset;
+                
+                qtd_temp = qtd1;
+                for(int i = 0; i < qtd1; i++) temporarios[i] = reg1[i];
+            }
         }
     }
-    fflush(hash->arquivo_cabecalho);
-
-    // Reinserção após divisão.
-    for(int i = 0; i < qtd_temp; i++) inserirHash(hash, temporarios[i].chave, temporarios[i].dados);
 
     return HASH_OK;
 }
@@ -318,101 +368,101 @@ void fecharHash(HashExtensivel* hash){
     }
 }
 
-// Função para deixar o campo de dados legíveis e com largura fixa.
-void dados_com_underline(const char *src, wchar_t *dst, int largura) {
-    int i;
-    for (i = 0; src[i] != '\0' && i < largura; i++)
-        dst[i] = (src[i] == ' ') ? L'_' : (wchar_t)src[i];
-    for (; i < largura; i++)
-        dst[i] = L'_';
-    dst[largura] = L'\0';
-}
-
 void dumpHash(HashExtensivel* hash, const char* nome_arq){
     if(!hash || !nome_arq) return;
-
+ 
     char nome_hfd[256];
     snprintf(nome_hfd, sizeof(nome_hfd), "%s.hfd", nome_arq);
     FILE* f = fopen(nome_hfd, "wb");
     if(!f) return;
-
-    /* Escreve BOM UTF-16 LE */
+ 
+    int total = 1 << hash->profundidade_global;
+ 
+    // Carrega diretório inteiro em memória 
+    int *dir = (int *)malloc((size_t)total * sizeof(int));
+    if (!dir) { fclose(f); return; }
+    fseek(hash->arquivo_cabecalho, HEADER_SIZE, SEEK_SET);
+    fread(dir, sizeof(int), (size_t)total, hash->arquivo_cabecalho);
+ 
+    // Array de visitados indexado por posição do bucket 
+    fseek(hash->arquivo_dados, 0, SEEK_END);
+    int tam_arquivo = (int)ftell(hash->arquivo_dados);
+    int max_buckets = tam_arquivo / (int)sizeof(Bucket) + 1;
+    char *visitado = (char *)calloc((size_t)max_buckets, 1);
+    if (!visitado) { free(dir); fclose(f); return; }
+ 
+    // BOM UTF-16
     unsigned char bom[2] = {0xFF, 0xFE};
     fwrite(bom, 1, 2, f);
+ 
+    #define WC(c) do { \
+        unsigned char _b[2] = {(unsigned char)(c), 0}; \
+        fwrite(_b, 1, 2, f); \
+    } while(0)
 
-    /* Macros auxiliares: escreve string literal como UTF-16 LE */
     #define W(str) do { \
         const char *_s = (str); \
-        while(*_s){ unsigned char _b[2] = {(unsigned char)*_s, 0}; \
-        fwrite(_b, 1, 2, f); _s++; } \
+        while(*_s){ WC(*_s); _s++; } \
     } while(0)
 
-    /* Escreve uma linha formatada como UTF-16 LE */
     #define WLINE(buf) do { \
-        char _tmp[512]; \
-        snprintf(_tmp, sizeof(_tmp), "%s", buf); \
-        W(_tmp); \
-        unsigned char _nl[2] = {'\n', 0}; fwrite(_nl, 1, 2, f); \
+        W(buf); WC('\r'); WC('\n'); \
     } while(0)
-
+ 
     char linha[512];
-    int total = 1 << hash->profundidade_global;
     int size_record = (int)sizeof(Registro);
     int size_block  = (int)sizeof(Bucket);
-
-    /* Conta buckets únicos */
+ 
+    // Buckets únicos
     int num_buckets = 0;
     for(int i = 0; i < total; i++){
-        int off_i = ler_offset_dir(hash, i);
-        int unico = 1;
-        for(int j = 0; j < i; j++)
-            if(ler_offset_dir(hash, j) == off_i){ unico = 0; break; }
-        if(unico) num_buckets++;
+        int idx = dir[i] / (int)sizeof(Bucket);
+        if(!visitado[idx]){ visitado[idx] = 1; num_buckets++; }
     }
-
+    memset(visitado, 0, (size_t)max_buckets);
+ 
     /* Cabeçalho */
-    W("DUMP"); unsigned char nl[2] = {'\n',0}; fwrite(nl,1,2,f);
-    W("*Dump cabecalho"); fwrite(nl,1,2,f);
-    snprintf(linha,sizeof(linha),"numBuckets\t%d",  num_buckets);  WLINE(linha);
-    snprintf(linha,sizeof(linha),"sizeRecord\t%d",  size_record);  WLINE(linha);
-    snprintf(linha,sizeof(linha),"sizeBlock\t%d",   size_block);   WLINE(linha);
-    snprintf(linha,sizeof(linha),"offsetKey\t%d",   0);            WLINE(linha);
-    snprintf(linha,sizeof(linha),"sizeKey\t%d",     MAX_CHAVE);    WLINE(linha);
-    snprintf(linha,sizeof(linha),"offsetTable\t%d", (int)HEADER_SIZE); WLINE(linha);
-    snprintf(linha,sizeof(linha),"offsetBuckets\t%d",  0);         WLINE(linha);
-    snprintf(linha,sizeof(linha),"offsetOverflow\t%d", -1);        WLINE(linha);
-
+    WLINE("DUMP");
+    WLINE("*Dump cabecalho");
+    snprintf(linha, sizeof(linha), "numBuckets %d",    num_buckets);  WLINE(linha);
+    snprintf(linha, sizeof(linha), "sizeRecord %d",    size_record);  WLINE(linha);
+    snprintf(linha, sizeof(linha), "sizeBlock %d",     size_block);   WLINE(linha);
+    snprintf(linha, sizeof(linha), "offsetKey %d",     0);            WLINE(linha);
+    snprintf(linha, sizeof(linha), "sizeKey %d",       MAX_CHAVE);    WLINE(linha);
+    snprintf(linha, sizeof(linha), "offsetTable %d",   (int)HEADER_SIZE); WLINE(linha);
+    snprintf(linha, sizeof(linha), "offsetBuckets %d", 0);            WLINE(linha);
+    snprintf(linha, sizeof(linha), "offsetOverflow %d", -1);          WLINE(linha);
+ 
     /* Diretório */
-    W("* Dump table"); fwrite(nl,1,2,f);
+    WLINE("* Dump table");
     for(int i = 0; i < total; i++){
-        snprintf(linha, sizeof(linha), "[%d]\t%d", i, ler_offset_dir(hash, i));
+        snprintf(linha, sizeof(linha), "[%d] %d", i, dir[i]);
         WLINE(linha);
     }
-
+ 
     /* Buckets */
-    W("*Dump buckets"); fwrite(nl,1,2,f);
+    WLINE("*Dump buckets");
     int bloco = 0;
     for(int i = 0; i < total; i++){
-        int offset = ler_offset_dir(hash, i);
-        int ja_visto = 0;
-        for(int j = 0; j < i; j++)
-            if(ler_offset_dir(hash, j) == offset){ ja_visto = 1; break; }
-        if(ja_visto) continue;
-
+        int offset = dir[i];
+        int idx    = offset / (int)sizeof(Bucket);
+ 
+        if(visitado[idx]) continue;
+        visitado[idx] = 1;
+ 
         Bucket balde;
         ler_bucket(hash, offset, &balde);
-
+ 
         snprintf(linha, sizeof(linha), "BLOCO: %d", bloco++);
         WLINE(linha);
-
+ 
         for(int k = 0; k < hash->cap_bucket; k++){
-            /* Substitui espaços por _ nos dados */
             char dados_u[MAX_DADOS];
             strncpy(dados_u, balde.registros[k].dados, MAX_DADOS - 1);
             dados_u[MAX_DADOS - 1] = '\0';
             for(int m = 0; dados_u[m]; m++)
                 if(dados_u[m] == ' ') dados_u[m] = '_';
-
+ 
             snprintf(linha, sizeof(linha), "%d | %s | %s | %d |",
                 balde.registros[k].ativo,
                 balde.registros[k].chave,
@@ -421,40 +471,56 @@ void dumpHash(HashExtensivel* hash, const char* nome_arq){
             WLINE(linha);
         }
     }
-
-    W("FIM DUMP"); fwrite(nl,1,2,f);
-
+ 
+    WLINE("FIM DUMP");
+ 
+    #undef WC
     #undef W
     #undef WLINE
-
+ 
+    free(visitado);
+    free(dir);
     fclose(f);
 }
 
-void iterarHash(HashExtensivel *hash, void (*callback)(const char *chave, const char *dados, void *cmd), void *cmd) {
+void iterarHash(HashExtensivel *hash,
+                void (*callback)(const char *chave, const char *dados, void *cmd),
+                void *cmd) {
     if (!hash || !callback) return;
 
     int total_dir = 1 << hash->profundidade_global;
 
-    /* Percorre apenas os buckets únicos — evita visitar o mesmo bucket
-    múltiplas vezes quando várias entradas do diretório apontam para ele */
-    for (int i = 0; i < total_dir; i++) {
-        int offset = ler_offset_dir(hash, i);
+    /* Carrega o diretório inteiro em memória */
+    int *dir = (int *)malloc((size_t)total_dir * sizeof(int));
+    if (!dir) return;
 
-        // Verifica se este offset já foi visitado. 
-        int ja_visto = 0;
-        for (int j = 0; j < i; j++) {
-            if (ler_offset_dir(hash, j) == offset) { ja_visto = 1; break; }
-        }
-        if (ja_visto) continue;
+    fseek(hash->arquivo_cabecalho, HEADER_SIZE, SEEK_SET);
+    fread(dir, sizeof(int), (size_t)total_dir, hash->arquivo_cabecalho);
+
+    /* Array de visitados indexado pelo offset */
+    fseek(hash->arquivo_dados, 0, SEEK_END);
+    int tam_arquivo = (int)ftell(hash->arquivo_dados);
+    int max_buckets = tam_arquivo / (int)sizeof(Bucket) + 1;
+
+    char *visitado = (char *)calloc((size_t)max_buckets, 1);
+    if (!visitado) { free(dir); return; }
+
+    for (int i = 0; i < total_dir; i++) {
+        int offset = dir[i];
+        int idx = offset / (int)sizeof(Bucket);
+
+        if (visitado[idx]) continue;
+        visitado[idx] = 1;
 
         Bucket b;
         ler_bucket(hash, offset, &b);
 
-        // Callback para cada slot.
         for (int k = 0; k < hash->cap_bucket; k++) {
-            if (b.registros[k].ativo) {
+            if (b.registros[k].ativo)
                 callback(b.registros[k].chave, b.registros[k].dados, cmd);
-            }
         }
     }
+
+    free(visitado);
+    free(dir);
 }
