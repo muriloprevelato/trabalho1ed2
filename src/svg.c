@@ -27,9 +27,8 @@ ArqSvg* abrirSvg(const char *caminho){
         "<svg xmlns:svg=\"http://www.w3.org/2000/svg\"\n"
         "     xmlns=\"http://www.w3.org/2000/svg\"\n"
         "     version=\"1.1\"\n"
-        "     viewBox=\"0 0 1500 1200\"\n"
-        "     width=\"100%%\" height=\"100%%\">\n");
-    
+        "     viewBox=\"0 0 10000 4000\"\n"
+        "     width=\"5000\" height=\"2000\">\n");
     return svg;
 }
 

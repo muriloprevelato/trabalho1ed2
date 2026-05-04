@@ -186,10 +186,10 @@ int main(int argc, char const *argv[])
             return 1;
         }
 
-        //Redesenha as quadras no novo caminho.
-        iterarHash(hashQuadras, desenhar_quadra_cb, svgQry);
         // Processa as alterações e novas impressões serão delimitadas atráves dos comandos.
         processarQry(caminho_qry, hashQuadras, hashPessoas, svgQry, txtQry);
+        //Redesenha as quadras no novo caminho.
+        iterarHash(hashQuadras, desenhar_quadra_cb, svgQry);
         
         fecharSvg(svgQry);
         fclose(txtQry);
